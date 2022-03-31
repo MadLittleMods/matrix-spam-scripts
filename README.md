@@ -41,3 +41,7 @@ Takes a list of bad event ID's and redacts them. (see script above for creating 
 ```
 node clean-up-bad-events.js --homeserver-url http://localhost:18008 --room-id !SdfEMelMdOPSHyPEBb_my.matrix.host --bad-event-ids-file-path "./data/!SdfEMelMdOPSHyPEBb_my.matrix.host/bad-event-ids-1648694479383.txt" --concurrency 5
 ```
+
+## `clean-up-bad-users.js`
+
+TODO
