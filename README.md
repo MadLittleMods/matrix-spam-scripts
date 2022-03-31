@@ -23,3 +23,9 @@ node fetch-events-from-room.js --homeserver-url http://localhost:18008 --room-id
 
 node fetch-events-from-room.js --homeserver-url http://localhost:18008 --room-id !SdfEMelMdOPSHyPEBb:my.matrix.host --resume
 ```
+
+## `find-bad-events.js`
+
+```
+node find-bad-events.js --room-id !SdfEMelMdOPSHyPEBb:my.matrix.host --grep "awfe"
+```

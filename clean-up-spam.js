@@ -1,5 +1,3 @@
-'use strict';
-
 const { MatrixClient } = require('matrix-bot-sdk');
 
-const client = new MatrixClient(homeserverUrl, secrets.accessToken);
+const client = new MatrixClient(opts.homeserverUrl, opts.accessToken);

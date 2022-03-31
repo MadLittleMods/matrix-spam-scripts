@@ -1,9 +1,11 @@
 'use strict';
 
 const assert = require('assert');
+const path = require('path').posix;
 const readline = require('readline');
 
 const outputFile = require('./lib/output-file');
+const { getMessageStorageDirForRoomId } = require('./lib/get-storage-dir-for-room-id');
 const { fetchEndpointAsJson } = require('./lib/fetch-endpoint');
 
 let config = {};
@@ -24,7 +26,7 @@ const opts = Object.assign(
     })
     .option('homeserver-url', {
       required: true,
-      description: 'Which room to fetch messages from',
+      description: 'Which homeserver to interact with',
     })
     .option('room-id', {
       required: true,
@@ -44,11 +46,6 @@ const opts = Object.assign(
     .help('help')
     .alias('help', 'h').argv
 );
-
-function getStorageDirForRoom(roomId) {
-  const storageDir = `./messages/${roomId.replace(':', '_')}`;
-  return storageDir;
-}
 
 async function fetchMessages(roomId, from, limit = 100) {
   let url = `${opts.homeserverUrl}/_matrix/client/r0/rooms/${encodeURIComponent(
@@ -102,7 +99,10 @@ async function paginateUntilDate({
   // Only persist to disk every 10 requests
   // or flush when we will no longer continue paginating
   if (meta.requestCount % 10 === 0 || !shouldContinue) {
-    const path = `${getStorageDirForRoom(roomId)}/start_${meta.start}__end_${meta.end}.ndjson`;
+    const ndjsonEventsFilePath = path.join(
+      getMessageStorageDirForRoomId(roomId),
+      `start_${meta.start}__end_${meta.end}.ndjson`
+    );
 
     const ndjsonEvents = meta.eventsToPersist
       .map((event) => {
@@ -110,11 +110,11 @@ async function paginateUntilDate({
       })
       .join('\n');
 
-    await outputFile(path, ndjsonEvents);
+    await outputFile(ndjsonEventsFilePath, ndjsonEvents);
 
     // Output a file we can read later to resume our position.
     await outputFile(
-      `${getStorageDirForRoom(roomId)}/resume.json`,
+      path.join(getMessageStorageDirForRoomId(roomId), `/resume.json`),
       JSON.stringify({
         from: meta.end,
       })
@@ -148,7 +148,7 @@ async function paginateUntilDate({
 async function exec() {
   let from;
   if (opts.resume) {
-    const resumeDate = require(`./${getStorageDirForRoom(opts.roomId)}/resume.json`);
+    const resumeDate = require(`./${getMessageStorageDirForRoomId(opts.roomId)}/resume.json`);
     from = resumeDate.from;
   }
 
