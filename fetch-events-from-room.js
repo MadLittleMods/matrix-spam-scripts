@@ -8,6 +8,15 @@ const outputFile = require('./lib/output-file');
 const { getMessageStorageDirForRoomId } = require('./lib/get-storage-dir-for-room-id');
 const { fetchEndpointAsJson } = require('./lib/fetch-endpoint');
 
+// How many messages we request at a time
+const MESSAGE_FETCH_LIMIT = 100;
+// How many times we will retry fetching messages at a given point in time before giving up
+// This is high because we want to set and forget this script and come back to a full list of messages.
+// If something has failed more than 100 times, something bigger is probably going wrong.
+const REQUEST_RETRY_LIMIT = 100;
+// How many message requests we receive before persisting those results to disk (avoid thrashing the disk)
+const NUM_REQUESTS_PER_PERSIST_INTERVAL = 10;
+
 let config = {};
 try {
   config = require('./config.json');
@@ -26,7 +35,7 @@ const opts = Object.assign(
     })
     .option('homeserver-url', {
       required: true,
-      description: 'Which homeserver to interact with',
+      description: 'Which homeserver to interact with (no trailing slash)',
     })
     .option('room-id', {
       required: true,
@@ -77,8 +86,24 @@ async function paginateUntilDate({
     eventsToPersist: [],
   },
 }) {
-  const fetchLimit = 100;
-  const responseData = await fetchMessages(roomId, from, fetchLimit);
+  rl.write('^');
+
+  // Just keep re-trying on failures (we retry up to REQUEST_RETRY_LIMIT times)
+  let requestSuccess = false;
+  let requestCount = 0;
+  do {
+    try {
+      const responseData = await fetchMessages(roomId, from, MESSAGE_FETCH_LIMIT);
+      requestSuccess = true;
+    } catch (err) {
+      console.error(`Error while requesting messages for ${roomId} with from=${from}`);
+    }
+
+    // Increment this here in case of any failures
+    requestCount += 1;
+  } while (!requestSuccess && requestCount < REQUEST_RETRY_LIMIT);
+
+  rl.write('v');
 
   meta.requestCount += 1;
   meta.eventsToPersist.push(...responseData.chunk);
@@ -91,14 +116,14 @@ async function paginateUntilDate({
 
   const lastEventInChunk = responseData.chunk[responseData.chunk.length - 1];
   const shouldContinue =
-    // If the chunk is filled to the limit, then there are more messages to paginate (continue)
-    responseData.chunk.length >= fetchLimit &&
+    // If there are messages in the chunk, then there are probably more messages to paginate (continue)
+    responseData.chunk.length !== 0 &&
     // Continue if no stopDate or the last event is still more recent than the stopDate (continue)
     (!stopDate || (lastEventInChunk && lastEventInChunk.origin_server_ts > stopDate));
 
-  // Only persist to disk every 10 requests
+  // Only persist to disk every NUM_REQUESTS_PER_PERSIST_INTERVAL requests
   // or flush when we will no longer continue paginating
-  if (meta.requestCount % 10 === 0 || !shouldContinue) {
+  if (meta.requestCount % NUM_REQUESTS_PER_PERSIST_INTERVAL === 0 || !shouldContinue) {
     const ndjsonEventsFilePath = path.join(
       getMessageStorageDirForRoomId(roomId),
       `start_${meta.start}__end_${meta.end}.ndjson`
@@ -119,6 +144,8 @@ async function paginateUntilDate({
         from: meta.end,
       })
     );
+
+    rl.write('|');
 
     // Reset the meta
     meta.start = null;
