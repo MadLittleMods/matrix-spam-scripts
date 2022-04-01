@@ -55,3 +55,17 @@ node clean-up-bad-users.js --homeserver-url http://localhost:18008 --room-id !Sd
 ```
 node collate-bad-senders-and-get-bad-servers.js --room-id !SdfEMelMdOPSHyPEBb:my.matrix.host"
 ```
+
+### `find-bulk-spam-membership-in-room.js`
+
+The logic in this is pretty specific to the incident we were using it with but it looks through all of the room membership and finds MXID's which match a certain pattern.
+
+If `--membership-file-path` is not provided, it will fetch the membership again.
+
+Results are saved out to `./data/{roomId}/bulk-spam-mxids-{date}.txt` and `./data/{roomId}/bulk-spam-servers-{date}.txt`.
+
+```
+node find-bulk-spam-membership-in-room.js --homeserver-url http://localhost:18008 --room-id !SdfEMelMdOPSHyPEBb_my.matrix.host --since 1648425600000
+
+node find-bulk-spam-membership-in-room.js --homeserver-url http://localhost:18008 --room-id !SdfEMelMdOPSHyPEBb_my.matrix.host --since 1648425600000 --membership-file-path "./data/!SdfEMelMdOPSHyPEBb_my.matrix.host/members-1648774700622.ndjson"
+```

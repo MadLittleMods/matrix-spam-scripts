@@ -66,8 +66,8 @@ const rl = readline.createInterface({
 
 async function processFile(filePath) {
   return new Promise((resolve, reject) => {
-    let badEventIds = [];
-    let badSenderMap = {};
+    const badEventIds = [];
+    const badSenderMap = {};
     let numberOfLines = 0;
 
     const lr = new LineByLineReader(filePath);
