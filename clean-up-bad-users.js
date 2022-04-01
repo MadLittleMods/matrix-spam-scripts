@@ -26,13 +26,13 @@ const opts = Object.assign(
       required: true,
       description: 'Which room to remove events from',
     })
-    .option('bad-event-ids-file-path', {
+    .option('bad-users-file-path', {
       required: true,
-      description: 'Path to the bad-event-ids-${dateString}.txt to use',
+      description: 'Path to the bad-senders-${dateString}.txt to use or any list of bad users',
     })
     .option('concurrency', {
       required: false,
-      description: 'Number of redaction requests to have flying around at once',
+      description: 'Number of ban requests to have flying around at once',
       default: 1,
     })
     .help('help')
@@ -48,11 +48,11 @@ async function processEvents() {
   return new Promise((resolve, reject) => {
     const client = new MatrixClient(opts.homeserverUrl, opts.accessToken);
 
-    const lr = new LineByLineReader(opts.badEventIdsFilePath);
+    const lr = new LineByLineReader(opts.badUsersFilePath);
     let lineReaderEnded = false;
 
     lr.on('error', function (err) {
-      console.error(`Error while reading lines from ${opts.badEventIdsFilePath}`, err);
+      console.error(`Error while reading lines from ${opts.badUsersFilePath}`, err);
       reject(err);
     });
 
@@ -62,7 +62,7 @@ async function processEvents() {
       numberOfLines += 1;
       numberOfLinesCurrentlyBeingProcessed += 1;
 
-      const eventId = line;
+      const badUserMxid = line;
       const currentLine = numberOfLines;
 
       if (numberOfLinesCurrentlyBeingProcessed >= opts.concurrency) {
@@ -70,11 +70,11 @@ async function processEvents() {
         lr.pause();
       }
 
-      // Retry the redaction until it succeeds. Handles backing off for rate-limits
-      let redaction;
+      // Retry the ban until it succeeds. Handles backing off for rate-limits
+      let ban;
       do {
         try {
-          redaction = await client.redactEvent(opts.roomId, eventId);
+          ban = await client.banUser(badUserMxid, opts.roomId);
         } catch (err) {
           // Handle rate-limiting
           if (err.body && err.body.errcode === 'M_LIMIT_EXCEEDED') {
@@ -86,7 +86,7 @@ async function processEvents() {
             console.error(`Error while removing bad event ${eventId}`, err);
           }
         }
-      } while (!redaction);
+      } while (!ban);
 
       //console.debug('Finished processing line', currentLine);
       rl.write('.');
